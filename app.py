@@ -3,9 +3,9 @@ import pandas as pd
 import os
 
 app = Flask(__name__)
-DATA_DIR = 'data'
-EXCEL_FILE = os.path.join(DATA_DIR, 'e.xlsx')
-CSV_FILE   = os.path.join(DATA_DIR, 'dialysis_data.csv')
+DATA_DIR = '.'
+EXCEL_FILE = os.path.join('e.xlsx') #(DATA_DIR, 'e.xlsx')
+CSV_FILE   = os.path.join('dialysis_data.csv')
 
 def prepare_csv():
     """讀取 Excel 並儲存為 CSV，保留 ROC 年-月格式。"""
@@ -43,18 +43,6 @@ def api_data():
         'peri_visits':  data['peri_visits'].tolist(),
         'hemo_patients':data['hemo_patients'].tolist(),
         'peri_ratio':   data['peri_ratio'].round(3).tolist()
-    })
-
-@app.route('/api/summary')
-def api_summary():
-    total = 4
-    completed = 4
-    abnormal = 0
-    return jsonify({
-        'total_metrics':     total,
-        'completed_metrics': completed,
-        'abnormal_rate':     abnormal,
-        'completion_rate':   round(completed/total*100)
     })
 
 if __name__ == '__main__':
