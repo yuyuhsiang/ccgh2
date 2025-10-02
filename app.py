@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 import pandas as pd
 import os
 
@@ -29,7 +29,7 @@ df = pd.read_csv(CSV_FILE, dtype={'year_month': str})
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return send_from_directory('.', 'index.html')
 
 @app.route('/api/data')
 def api_data():
