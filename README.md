@@ -3,3 +3,4 @@
 執行步驟:  
 1、執行app.py  
 2、進入網址http://127.0.0.1:5000/  
+![README.png](\README.png "README.png")
