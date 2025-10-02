@@ -4,8 +4,8 @@ import os
 
 app = Flask(__name__)
 DATA_DIR = '.'
-EXCEL_FILE = os.path.join('e.xlsx') #(DATA_DIR, 'e.xlsx')
-CSV_FILE   = os.path.join('dialysis_data.csv')
+EXCEL_FILE = os.path.join(DATA_DIR, 'e.xlsx') #(DATA_DIR, 'e.xlsx')
+CSV_FILE   = os.path.join(DATA_DIR, 'dialysis_data.csv')
 
 def prepare_csv():
     """讀取 Excel 並儲存為 CSV，保留 ROC 年-月格式。"""
