@@ -8,11 +8,13 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
   <style>
     .card { min-height:200px; }
+    #availableRange { font-weight: bold; }
   </style>
 </head>
 <body class="bg-light">
   <div class="container-fluid p-4">
-    <div class="row mb-4">
+    <!-- 上傳與篩選列 -->
+    <div class="row mb-4 align-items-center">
       <div class="col-md-3">
         <input type="file" id="fileInput" class="form-control" accept=".xlsx,.xls">
       </div>
@@ -25,102 +27,145 @@
       <div class="col-md-2">
         <button id="btnLoad" class="btn btn-primary" disabled>分析</button>
       </div>
+      <div class="col-md-3 text-end text-truncate" style="font-size:.9rem; color:gray;">
+        可篩選日期範圍：<span id="availableRange">尚無資料</span>
+      </div>
     </div>
 
+    <!-- 四張折線圖卡片 -->
     <div class="card mb-4">
       <div class="card-header bg-info text-white">
         <i class="bi bi-graph-up"></i> 指標分析
       </div>
       <div class="card-body">
         <div class="row">
-          <div class="col-md-6 mb-4"><h6>血液透析次數</h6><canvas id="chartHemoVisits"></canvas></div>
-          <div class="col-md-6 mb-4"><h6>腹膜透析人數</h6><canvas id="chartPeriPatients"></canvas></div>
-          <div class="col-md-6 mb-4"><h6>血液透析人數</h6><canvas id="chartHemoPatients"></canvas></div>
-          <div class="col-md-6 mb-4"><h6>腹膜透析佔比</h6><canvas id="chartPeriRatio"></canvas></div>
+          <div class="col-md-6 mb-4">
+            <h6>血液透析次數</h6>
+            <canvas id="chartHemoVisits" style="height:200px;"></canvas>
+          </div>
+          <div class="col-md-6 mb-4">
+            <h6>腹膜透析人數</h6>
+            <canvas id="chartPeriPatients" style="height:200px;"></canvas>
+          </div>
+          <div class="col-md-6 mb-4">
+            <h6>血液透析人數</h6>
+            <canvas id="chartHemoPatients" style="height:200px;"></canvas>
+          </div>
+          <div class="col-md-6 mb-4">
+            <h6>腹膜透析佔比</h6>
+            <canvas id="chartPeriRatio" style="height:200px;"></canvas>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
+  <!-- 依賴檔 -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
   <script>
     Chart.register(ChartDataLabels);
 
-    function createChart(ctx,label,color,fmt){
-      return new Chart(ctx,{type:'line',
-        data:{labels:[],datasets:[{label,data:[],borderColor:color}]},
-        options:{scales:fmt?{y:{beginAtZero:true}}:{},plugins:{datalabels:{align:'top',color,font:{size:12},formatter:fmt||(v=>v)}}}
+    // 建立折線圖函式
+    function createChart(ctx, label, color, fmt) {
+      return new Chart(ctx, {
+        type: 'line',
+        data: { labels: [], datasets: [{ label, data: [], borderColor: color }] },
+        options: {
+          scales: fmt ? { y: { beginAtZero: true } } : {},
+          plugins: {
+            datalabels: {
+              align: 'top',
+              color,
+              font: { size: 12 },
+              formatter: fmt || (v => v)
+            }
+          }
+        }
       });
     }
-    const chartHemoVisits   = createChart(document.getElementById('chartHemoVisits').getContext('2d'),'血液透析次數','#007bff');
-    const chartPeriPatients = createChart(document.getElementById('chartPeriPatients').getContext('2d'),'腹膜透析人數','#28a745');
-    const chartHemoPatients = createChart(document.getElementById('chartHemoPatients').getContext('2d'),'血液透析人數','#ffc107');
-    const chartPeriRatio     = createChart(document.getElementById('chartPeriRatio').getContext('2d'),'腹膜透析佔比','#dc3545',v=> (v*100).toFixed(1)+'%');
 
-    let allData=[];
+    // 四張圖
+    const chartHemoVisits   = createChart(document.getElementById('chartHemoVisits').getContext('2d'), '血液透析次數', '#007bff');
+    const chartPeriPatients  = createChart(document.getElementById('chartPeriPatients').getContext('2d'), '腹膜透析人數', '#28a745');
+    const chartHemoPatients  = createChart(document.getElementById('chartHemoPatients').getContext('2d'), '血液透析人數', '#ffc107');
+    const chartPeriRatio     = createChart(document.getElementById('chartPeriRatio').getContext('2d'), '腹膜透析佔比', '#dc3545', v => (v*100).toFixed(1) + '%');
 
-    function rocToIso(m){
-      const [yy,mm]=m.split('-');
-      return (parseInt(yy,10)+1911)+'-'+mm;
+    let allData = [];
+
+    // 民國 ↔ 西元 轉換
+    function rocToIso(m) {
+      const [yy, mm] = m.split('-');
+      return (parseInt(yy, 10) + 1911) + '-' + mm;
     }
-    function isoToRoc(m){
-      const [yyyy,mm]=m.split('-');
-      return (parseInt(yyyy,10)-1911).toString().padStart(3,'0')+'-'+mm;
+    function isoToRoc(m) {
+      const [yyyy, mm] = m.split('-');
+      return (parseInt(yyyy, 10) - 1911).toString().padStart(3, '0') + '-' + mm;
     }
 
-    document.getElementById('fileInput').addEventListener('change',e=>{
-      const file=e.target.files[0]; if(!file) return;
-      const reader=new FileReader();
-      reader.onload=ev=>{
-        const wb=XLSX.read(new Uint8Array(ev.target.result),{type:'array'});
-        const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:0});
-        const hdr=rows[0].slice(1);
-        const visits=rows[1].slice(1).map(Number);
-        const peri=rows[2].slice(1).map(Number);
-        const hemo=rows[3].slice(1).map(Number);
-        allData=hdr.map((m,i)=>({
-          ym:m, hemoVisits:visits[i], peritoneal:peri[i], hemoCount:hemo[i]
+    // 處理 Excel 上傳
+    document.getElementById('fileInput').addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header:1, defval:0 });
+        const hdr    = rows[0].slice(1);
+        const visits = rows[1].slice(1).map(Number);
+        const peri   = rows[2].slice(1).map(Number);
+        const hemo   = rows[3].slice(1).map(Number);
+        allData = hdr.map((m, i) => ({
+          ym: m,
+          hemoVisits: visits[i],
+          peritoneal: peri[i],
+          hemoCount: hemo[i]
         }));
         initControls();
       };
       reader.readAsArrayBuffer(file);
     });
 
-    function initControls(){
-      const sm=document.getElementById('startMonth'),
-            em=document.getElementById('endMonth'),
-            btn=document.getElementById('btnLoad');
-      const isoList=allData.map(d=>rocToIso(d.ym)).sort();
-      sm.min=em.min=isoList[0];
-      sm.max=em.max=isoList[isoList.length-1];
-      sm.value=''; em.value='';
-      sm.disabled=em.disabled=false;
-      btn.disabled=true;
-      [sm,em].forEach(inp=>{
-        inp.addEventListener('change',()=>{
-          btn.disabled = !(sm.value && em.value && sm.value<=em.value);
+    // 初始化控制項
+    function initControls() {
+      const sm = document.getElementById('startMonth'),
+            em = document.getElementById('endMonth'),
+            btn = document.getElementById('btnLoad'),
+            rangeLabel = document.getElementById('availableRange');
+      const isoList = allData.map(d => rocToIso(d.ym)).sort();
+      sm.min = em.min = isoList[0];
+      sm.max = em.max = isoList[isoList.length-1];
+      sm.value = '';
+      em.value = '';
+      sm.disabled = em.disabled = false;
+      btn.disabled = true;
+      rangeLabel.textContent = isoList[0] + ' ~ ' + isoList[isoList.length-1];
+      [sm, em].forEach(inp => {
+        inp.addEventListener('change', () => {
+          btn.disabled = !(sm.value && em.value && sm.value <= em.value);
         });
       });
-      btn.onclick=()=>{
-        const s=isoToRoc(sm.value), e=isoToRoc(em.value);
-        drawCharts(allData.filter(d=>d.ym>=s&&d.ym<=e));
+      btn.onclick = () => {
+        const s = isoToRoc(sm.value), e = isoToRoc(em.value);
+        drawCharts(allData.filter(d => d.ym >= s && d.ym <= e));
       };
     }
 
-    function drawCharts(data){
-      const labels=data.map(d=>rocToIso(d.ym));
-      [chartHemoVisits,chartPeriPatients,chartHemoPatients,chartPeriRatio]
-        .forEach(ch=>ch.data.labels=labels);
-      chartHemoVisits.data.datasets[0].data  =data.map(d=>d.hemoVisits);
-      chartPeriPatients.data.datasets[0].data=data.map(d=>d.peritoneal);
-      chartHemoPatients.data.datasets[0].data=data.map(d=>d.hemoCount);
-      chartPeriRatio.data.datasets[0].data   =data.map(d=>{
-        const t=d.peritoneal+d.hemoCount; return t?d.peritoneal/t:0;
+    // 繪製圖表
+    function drawCharts(data) {
+      const labels = data.map(d => rocToIso(d.ym));
+      [chartHemoVisits, chartPeriPatients, chartHemoPatients, chartPeriRatio]
+        .forEach(ch => ch.data.labels = labels);
+      chartHemoVisits.data.datasets[0].data  = data.map(d => d.hemoVisits);
+      chartPeriPatients.data.datasets[0].data = data.map(d => d.peritoneal);
+      chartHemoPatients.data.datasets[0].data = data.map(d => d.hemoCount);
+      chartPeriRatio.data.datasets[0].data    = data.map(d => {
+        const tot = d.peritoneal + d.hemoCount;
+        return tot > 0 ? d.peritoneal / tot : 0;
       });
-      [chartHemoVisits,chartPeriPatients,chartHemoPatients,chartPeriRatio]
-        .forEach(ch=>ch.update());
+      [chartHemoVisits, chartPeriPatients, chartHemoPatients, chartPeriRatio]
+        .forEach(ch => ch.update());
     }
   </script>
 </body>
