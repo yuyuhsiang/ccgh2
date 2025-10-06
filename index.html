@@ -68,29 +68,54 @@
     Chart.register(ChartDataLabels);
 
     // 建立折線圖函式
-    function createChart(ctx, label, color, fmt) {
+    function createChart(ctx, label, color) {
       return new Chart(ctx, {
         type: 'line',
-        data: { labels: [], datasets: [{ label, data: [], borderColor: color }] },
+        data: { labels: [], datasets: [{ label, data: [], borderColor: color, yAxisID: 'y' }] },
         options: {
-          scales: fmt ? { y: { beginAtZero: true } } : {},
+          scales: { y: { beginAtZero: true, title: { display: true, text: '值' } } },
+          plugins: {
+            datalabels: { align: 'top', color, font: { size: 12 }, formatter: v => v }
+          }
+        }
+      });
+    }
+
+    // 建立腹膜佔比圖表，右側百分比軸
+    function createRatioChart(ctx) {
+      return new Chart(ctx, {
+        type: 'line',
+        data: { labels: [], datasets: [{ label: '腹膜透析佔比', data: [], borderColor: '#dc3545', yAxisID: 'y1' }] },
+        options: {
+          scales: {
+            y: { display: false },
+            y1: {
+              position: 'left',
+              beginAtZero: true,
+              max: 1,
+              ticks: {
+                callback: v => (v * 100).toFixed(0) + '%'
+              },
+              title: { display: true, text: '百分比' }
+            }
+          },
           plugins: {
             datalabels: {
               align: 'top',
-              color,
+              color: '#dc3545',
               font: { size: 12 },
-              formatter: fmt || (v => v)
+              formatter: v => (v * 100).toFixed(1) + '%'
             }
           }
         }
       });
     }
 
-    // 四張圖
+    // 初始化四張圖
     const chartHemoVisits   = createChart(document.getElementById('chartHemoVisits').getContext('2d'), '血液透析次數', '#007bff');
     const chartPeriPatients  = createChart(document.getElementById('chartPeriPatients').getContext('2d'), '腹膜透析人數', '#28a745');
     const chartHemoPatients  = createChart(document.getElementById('chartHemoPatients').getContext('2d'), '血液透析人數', '#ffc107');
-    const chartPeriRatio     = createChart(document.getElementById('chartPeriRatio').getContext('2d'), '腹膜透析佔比', '#dc3545', v => (v*100).toFixed(1) + '%');
+    const chartPeriRatio     = createRatioChart(document.getElementById('chartPeriRatio').getContext('2d'));
 
     let allData = [];
 
@@ -155,17 +180,16 @@
     // 繪製圖表
     function drawCharts(data) {
       const labels = data.map(d => rocToIso(d.ym));
-      [chartHemoVisits, chartPeriPatients, chartHemoPatients, chartPeriRatio]
-        .forEach(ch => ch.data.labels = labels);
+      [chartHemoVisits, chartPeriPatients, chartHemoPatients].forEach(ch => ch.data.labels = labels);
       chartHemoVisits.data.datasets[0].data  = data.map(d => d.hemoVisits);
       chartPeriPatients.data.datasets[0].data = data.map(d => d.peritoneal);
       chartHemoPatients.data.datasets[0].data = data.map(d => d.hemoCount);
-      chartPeriRatio.data.datasets[0].data    = data.map(d => {
+      chartPeriRatio.data.labels             = labels;
+      chartPeriRatio.data.datasets[0].data   = data.map(d => {
         const tot = d.peritoneal + d.hemoCount;
         return tot > 0 ? d.peritoneal / tot : 0;
       });
-      [chartHemoVisits, chartPeriPatients, chartHemoPatients, chartPeriRatio]
-        .forEach(ch => ch.update());
+      [chartHemoVisits, chartPeriPatients, chartHemoPatients, chartPeriRatio].forEach(ch => ch.update());
     }
   </script>
 </body>
